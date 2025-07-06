@@ -1,0 +1,33 @@
+# Core Hugging Face libraries
+transformers>=4.30.0
+datasets>=2.10.0
+tokenizers>=0.13.0
+
+# PyTorch (choose one based on your system)
+torch>=2.0.0
+
+# Web app framework
+streamlit>=1.28.0
+plotly>=5.17.0
+
+# Additional useful libraries
+numpy>=1.21.0
+pandas>=1.3.0
+scikit-learn>=1.0.0
+
+# For specific tasks
+sentencepiece>=0.1.97  # For some tokenizers
+protobuf>=3.20.0       # For some models
+
+# Optional: For faster training/inference
+accelerate>=0.20.0     # For distributed training
+optimum>=1.8.0         # For model optimization
+
+# Development and visualization
+matplotlib>=3.5.0
+seaborn>=0.11.0
+jupyter>=1.0.0
+
+# Optional: For specific model types
+timm>=0.6.0           # For vision transformers
+librosa>=0.9.0        # For audio processing

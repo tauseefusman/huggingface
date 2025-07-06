@@ -1,0 +1,15 @@
+[project]
+name = "huggingface"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "datasets>=3.6.0",
+    "torch>=2.7.1",
+    "transformers>=4.52.4",
+    "streamlit>=1.28.0",
+    "plotly>=5.17.0",
+    "pandas>=2.1.0",
+    "numpy>=1.24.0",
+]
