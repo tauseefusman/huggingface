@@ -1,0 +1,22 @@
+{
+	"servers": {
+		"fetch": {
+			"command": "uvx",
+			"args": [
+				"mcp-server-fetch"
+			],
+			"type": "stdio"
+		},
+		"supabase": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@supabase/mcp-server-supabase@latest",
+				"--access-token",
+				"sbp_b966de49357ff29169887d01165c9ae8ebf4e894"
+			],
+			"type": "stdio"
+		},
+
+	}
+}

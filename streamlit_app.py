@@ -20,6 +20,8 @@ from transformers import (
 from datasets import load_dataset
 import torch
 import warnings
+import chromadb
+from typing import Dict, Any
 warnings.filterwarnings('ignore')
 
 # Page configuration
@@ -84,7 +86,8 @@ page = st.sidebar.selectbox(
         "🔍 Named Entity Recognition",
         "💬 Text Generation",
         "📈 Model Comparison",
-        "🔧 Custom Pipeline"
+        "🔧 Custom Pipeline",
+        "🗃️ ChromaDB Search"
     ]
 )
 
@@ -1064,6 +1067,177 @@ elif page == "🔧 Custom Pipeline":
                 st.dataframe(df_summary, use_container_width=True)
         else:
             st.warning("Please enter some text!")
+
+# ChromaDB Search Page
+elif page == "🗃️ ChromaDB Search":
+    st.markdown('<h2 class="section-header">🗃️ ChromaDB Intelligent Search</h2>', unsafe_allow_html=True)
+    
+    st.markdown("""
+    Search through our comprehensive knowledge base of ML documentation, code examples, 
+    research papers, and FAQs using semantic search powered by ChromaDB.
+    """)
+    
+    @st.cache_resource
+    def init_chromadb():
+        """Initialize ChromaDB client and load collections"""
+        try:
+            client = chromadb.PersistentClient(path="./chroma_db")
+            collections = {}
+            collection_names = ["ml_documentation", "code_examples", "research_papers", "faq"]
+            
+            for name in collection_names:
+                try:
+                    collections[name] = client.get_collection(name=name)
+                except:
+                    continue
+            
+            return collections
+        except Exception as e:
+            st.error(f"Failed to initialize ChromaDB: {e}")
+            return {}
+    
+    def search_collections(collections: Dict, query: str, collection_filter: str = "all", n_results: int = 3):
+        """Search ChromaDB collections"""
+        if not collections:
+            return {}
+        
+        results = {}
+        
+        if collection_filter == "all":
+            # Search all collections
+            for name, collection in collections.items():
+                try:
+                    result = collection.query(query_texts=[query], n_results=n_results)
+                    if result['documents'][0]:  # If any results found
+                        results[name] = result
+                except Exception as e:
+                    st.warning(f"Error searching {name}: {e}")
+        else:
+            # Search specific collection
+            if collection_filter in collections:
+                try:
+                    result = collections[collection_filter].query(query_texts=[query], n_results=n_results)
+                    results[collection_filter] = result
+                except Exception as e:
+                    st.error(f"Error searching {collection_filter}: {e}")
+        
+        return results
+    
+    # Initialize ChromaDB
+    collections = init_chromadb()
+    
+    if collections:
+        st.success(f"✅ Connected to ChromaDB with {len(collections)} collections")
+        
+        # Show collection stats
+        with st.expander("📊 Collection Statistics"):
+            stats_cols = st.columns(len(collections))
+            for i, (name, collection) in enumerate(collections.items()):
+                with stats_cols[i]:
+                    count = collection.count()
+                    st.metric(
+                        label=name.replace("_", " ").title(),
+                        value=f"{count} docs"
+                    )
+        
+        # Search interface
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            query = st.text_input(
+                "🔍 Enter your search query:",
+                placeholder="e.g., How to fine-tune BERT for sentiment analysis?",
+                help="Use natural language to search across all our ML resources"
+            )
+        
+        with col2:
+            collection_filter = st.selectbox(
+                "Collection:",
+                ["all"] + list(collections.keys()),
+                format_func=lambda x: "All Collections" if x == "all" else x.replace("_", " ").title()
+            )
+        
+        # Advanced options
+        with st.expander("⚙️ Advanced Options"):
+            n_results = st.slider("Number of results per collection", 1, 10, 3)
+            show_metadata = st.checkbox("Show metadata", value=True)
+            show_similarity = st.checkbox("Show similarity scores", value=False)
+        
+        # Search button and results
+        if st.button("🔍 Search", type="primary") or query:
+            if query.strip():
+                with st.spinner("Searching knowledge base..."):
+                    search_results = search_collections(collections, query, collection_filter, n_results)
+                
+                if search_results:
+                    st.markdown(f"### 📋 Search Results for: *'{query}'*")
+                    
+                    # Display results by collection
+                    for collection_name, results in search_results.items():
+                        if results['documents'][0]:  # If results found
+                            with st.container():
+                                st.markdown(f"#### 📚 {collection_name.replace('_', ' ').title()}")
+                                
+                                for i, (doc, metadata) in enumerate(zip(results['documents'][0], results['metadatas'][0])):
+                                    with st.expander(f"Result {i+1}: {metadata.get('type', 'Document').title()}", expanded=i==0):
+                                        # Document content
+                                        if len(doc) > 500:
+                                            st.write(doc[:500] + "...")
+                                            with st.expander("📖 Show full content"):
+                                                st.write(doc)
+                                        else:
+                                            st.write(doc)
+                                        
+                                        # Metadata
+                                        if show_metadata and metadata:
+                                            st.markdown("**Metadata:**")
+                                            metadata_cols = st.columns(min(len(metadata), 3))
+                                            for j, (key, value) in enumerate(metadata.items()):
+                                                with metadata_cols[j % 3]:
+                                                    st.write(f"**{key.replace('_', ' ').title()}:** {value}")
+                                        
+                                        # Similarity score (if available and requested)
+                                        if show_similarity and 'distances' in results and i < len(results['distances'][0]):
+                                            distance = results['distances'][0][i]
+                                            similarity = 1 - distance  # Convert distance to similarity
+                                            st.progress(similarity, text=f"Similarity: {similarity:.2%}")
+                
+                else:
+                    st.warning("No results found. Try different search terms or check if ChromaDB is properly seeded.")
+            else:
+                st.warning("Please enter a search query.")
+        
+        # Quick search examples
+        st.markdown("### 💡 Try these example searches:")
+        example_queries = [
+            "What is BERT and how does it work?",
+            "Show me code for sentiment analysis",
+            "How to deploy models in production?",
+            "Transformer attention mechanisms",
+            "Fine-tuning best practices"
+        ]
+        
+        example_cols = st.columns(3)
+        for i, example in enumerate(example_queries):
+            with example_cols[i % 3]:
+                if st.button(f"🔍 {example}", key=f"example_{i}"):
+                    st.experimental_set_query_params(query=example)
+                    st.rerun()
+    
+    else:
+        st.error("❌ ChromaDB not available. Please run the seeding script first.")
+        
+        with st.expander("🔧 How to set up ChromaDB"):
+            st.code("""
+# Run the ChromaDB seeding script
+python chromatesting.py
+
+# This will create and populate:
+# - ML Documentation (4 docs)
+# - Code Examples (4 docs) 
+# - Research Papers (3 docs)
+# - FAQ (5 docs)
+            """)
 
 # Footer
 st.markdown("---")
